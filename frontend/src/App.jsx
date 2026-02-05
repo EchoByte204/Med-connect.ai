@@ -11,6 +11,7 @@ import HospitalFinder from './pages/HospitalFinder'
 import HealthChatbot from './pages/HealthChatbot'
 import Settings from './pages/Settings'
 import { preferencesStorage } from './utils/storage'
+import { AuthProvider } from './contexts/AuthContext'
 
 /* ── Dark-mode context (consumed by Settings toggle + Layout root) ── */
 export const DarkModeContext = createContext()
