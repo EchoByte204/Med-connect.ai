@@ -14,19 +14,22 @@ const Medications = () => {
 
   useEffect(() => { loadMedications() }, [])
 
-  const loadMedications = () => setMedications(medicationStorage.getAll())
+  const loadMedications = async () => setMedications(await medicationStorage.getAll())
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this medication?')) {
-      medicationStorage.delete(id)
-      reminderStorage.getByMedicineId(id).forEach(r => reminderStorage.delete(r.id))
+      await medicationStorage.delete(id)
+      const reminders = await reminderStorage.getByMedicineId(id)
+      for (const r of reminders) {
+        await reminderStorage.delete(r.id)
+      }
       loadMedications()
     }
   }
 
-  const handleToggleActive = (id) => {
+  const handleToggleActive = async (id) => {
     const med = medications.find(m => m.id === id)
-    medicationStorage.update(id, { isActive: !med.isActive })
+    await medicationStorage.update(id, { isActive: !med.isActive })
     loadMedications()
   }
 
@@ -220,12 +223,12 @@ const MedicationForm = ({ medication, onClose, onSave }) => {
     medication || { name: '', genericName: '', dosage: '', frequency: 'twice daily', duration: '7 days', instructions: '', category: 'other' }
   )
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (medication) {
-      medicationStorage.update(medication.id, formData)
+      await medicationStorage.update(medication.id, formData)
     } else {
-      medicationStorage.add({
+      await medicationStorage.add({
         id: generateId('med'), ...formData, prescriptionId: null,
         startDate: new Date().toISOString(),
         endDate: calculateEndDate(new Date().toISOString(), formData.duration),

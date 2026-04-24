@@ -18,20 +18,20 @@ const NotificationBell = () => {
     return () => clearInterval(interval)
   }, [])
 
-  const loadAlerts = () => {
-    const allAlerts = alertStorage.getAll()
-    const unread = alertStorage.getUnread()
+  const loadAlerts = async () => {
+    const allAlerts = await alertStorage.getAll()
+    const unread = await alertStorage.getUnread()
     setAlerts(allAlerts.slice(0, 5)) // Show last 5
     setUnreadCount(unread.length)
   }
 
-  const handleMarkAsRead = (id) => {
-    alertStorage.markAsRead(id)
+  const handleMarkAsRead = async (id) => {
+    await alertStorage.markAsRead(id)
     loadAlerts()
   }
 
-  const handleMarkAllAsRead = () => {
-    alertStorage.markAllAsRead()
+  const handleMarkAllAsRead = async () => {
+    await alertStorage.markAllAsRead()
     loadAlerts()
   }
 

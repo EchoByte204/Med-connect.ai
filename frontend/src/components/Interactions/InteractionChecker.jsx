@@ -15,9 +15,9 @@ const InteractionChecker = () => {
     loadMedications()
   }, [])
 
-  const loadMedications = () => {
-    const activeMeds = medicationStorage.getActive()
-    setMedications(activeMeds)
+  const loadMedications = async () => {
+    const activeMeds = await medicationStorage.getActive()
+    setMedications(activeMeds || [])
   }
 
   const handleCheckInteractions = async () => {

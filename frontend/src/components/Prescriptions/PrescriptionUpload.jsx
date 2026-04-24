@@ -68,22 +68,21 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
       const base64 = await fileToBase64(file)
 
       // Step 2: Create prescription object
-      const prescription = {
-        id: generateId('presc'),
+      const prescriptionInput = {
         fileName: file.name,
         fileUrl: base64,
         fileType: file.type.startsWith('image/') ? 'image' : 'pdf',
-        uploadDate: new Date().toISOString(),
-        doctorName: '',
-        patientName: '',
         medicines: [],
         rawText: '',
-        status: 'pending',
-        processedDate: ''
+        status: 'pending'
       }
 
-      // Step 3: Save prescription
-      prescriptionStorage.add(prescription)
+      // Step 3: Save prescription — capture the returned row (with real Supabase UUID)
+      const savedPrescription = await prescriptionStorage.add(prescriptionInput)
+      if (!savedPrescription) {
+        throw new Error('Could not save prescription. Make sure you are logged in and the database schema has been set up.')
+      }
+      const prescriptionId = savedPrescription.id   // real UUID from Supabase
       setStatus('Prescription uploaded! Starting OCR...')
 
       // Step 4: Extract text using OCR
@@ -105,7 +104,7 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
       if (!validation.isPrescription) {
         setError(`❌ This doesn't appear to be a medical prescription. ${validation.reason}`)
         setStatus('Validation failed')
-        prescriptionStorage.update(prescription.id, {
+        await prescriptionStorage.update(prescriptionId, {
           rawText: ocrResult.text,
           status: 'error'
         })
@@ -117,7 +116,7 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
       setStatus('✅ Valid prescription! Analyzing with AI...')
 
       // Step 6: Update prescription with OCR text
-      prescriptionStorage.update(prescription.id, {
+      await prescriptionStorage.update(prescriptionId, {
         rawText: ocrResult.text,
         status: 'processing'
       })
@@ -127,7 +126,7 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
 
       if (!aiResult.success || aiResult.medicines.length === 0) {
         // Still save as processed even if no medicines found
-        prescriptionStorage.update(prescription.id, {
+        await prescriptionStorage.update(prescriptionId, {
           status: 'processed',
           processedDate: new Date().toISOString()
         })
@@ -141,9 +140,8 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
       setStatus('Medicines extracted! Saving...')
 
       // Step 8: Save extracted medicines and create reminders
-      aiResult.medicines.forEach((med) => {
+      for (const med of aiResult.medicines) {
         const medication = {
-          id: generateId('med'),
           name: med.name,
           genericName: med.genericName || med.name,
           dosage: med.dosage,
@@ -152,20 +150,22 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
           instructions: med.instructions,
           category: med.category || 'other',
           explanation: med.explanation || 'No explanation available',
-          prescriptionId: prescription.id,
+          prescriptionId: prescriptionId,   // real UUID
           startDate: new Date().toISOString(),
           endDate: calculateEndDate(new Date(), med.duration),
           isActive: true,
           refillReminder: false
         }
-        medicationStorage.add(medication)
+        const savedMed = await medicationStorage.add(medication)
         
         // Automatically create reminders for this medication
-        createRemindersForMedication(medication)
-      })
+        if (savedMed) {
+          await createRemindersForMedication(savedMed)
+        }
+      }
 
       // Step 9: Update prescription status
-      prescriptionStorage.update(prescription.id, {
+      await prescriptionStorage.update(prescriptionId, {
         medicines: aiResult.medicines,
         status: 'processed',
         processedDate: new Date().toISOString()
@@ -173,7 +173,7 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
 
       // Step 10: Check for drug interactions
       setStatus('Checking for drug interactions...')
-      const allActiveMeds = medicationStorage.getActive()
+      const allActiveMeds = await medicationStorage.getActive()
       if (allActiveMeds.length >= 2) {
         const interactionResult = await checkMedicationInteractions(allActiveMeds)
         if (interactionResult.success && interactionResult.interactions.length > 0) {
@@ -185,7 +185,7 @@ const PrescriptionUpload = ({ onUploadComplete }) => {
       
       // Notify parent component
       if (onUploadComplete) {
-        onUploadComplete(prescription)
+        onUploadComplete(savedPrescription)
       }
 
       // Reset after 2 seconds

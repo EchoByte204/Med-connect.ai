@@ -38,15 +38,17 @@ const Prescriptions = () => {
 
   useEffect(() => { loadPrescriptions() }, [])
 
-  const loadPrescriptions = () => {
-    setPrescriptions([...prescriptionStorage.getAll()].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate)))
+  const loadPrescriptions = async () => {
+    const data = await prescriptionStorage.getAll()
+    setPrescriptions([...data].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate)))
   }
 
   const handleUploadComplete = () => { loadPrescriptions(); setShowUpload(false) }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this prescription?')) {
-      prescriptionStorage.delete(id); loadPrescriptions()
+      await prescriptionStorage.delete(id)
+      await loadPrescriptions()
       if (selectedPrescription?.id === id) setSelectedPrescription(null)
     }
   }

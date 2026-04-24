@@ -19,9 +19,9 @@ const Reminders = () => {
     return () => clearInterval(interval)
   }, [])
 
-  const loadData = () => {
-    setReminders(reminderStorage.getActive())
-    setMedications(medicationStorage.getActive())
+  const loadData = async () => {
+    setReminders(await reminderStorage.getActive())
+    setMedications(await medicationStorage.getActive())
   }
 
   const checkNotificationPermission = async () => {
@@ -33,35 +33,35 @@ const Reminders = () => {
     const now = new Date()
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     const dueReminders = reminders.filter(r => r.isActive && r.notificationEnabled && r.time === currentTime)
-    dueReminders.forEach(reminder => {
+    dueReminders.forEach(async reminder => {
       showNotification('💊 Medication Reminder', { body: `Time to take ${reminder.medicineName} - ${reminder.dosage}`, icon: '/medical-icon.svg' })
-      alertStorage.add({ id: generateId('alert'), type: 'reminder', severity: 'info', title: 'Medication Reminder', message: `Time to take ${reminder.medicineName} - ${reminder.dosage}`, timestamp: new Date().toISOString(), isRead: false, actionRequired: true, relatedId: reminder.id })
+      await alertStorage.add({ type: 'reminder', severity: 'info', title: 'Medication Reminder', message: `Time to take ${reminder.medicineName} - ${reminder.dosage}` })
     })
   }
 
-  const handleMarkAsTaken = (id) => {
-    reminderStorage.markAsTaken(id)
+  const handleMarkAsTaken = async (id) => {
+    await reminderStorage.markAsTaken(id)
     const reminder = reminders.find(r => r.id === id)
-    adherenceStorage.add({ id: generateId('adh'), medicineId: reminder.medicineId, medicineName: reminder.medicineName, dosage: reminder.dosage, takenAt: new Date().toISOString(), reminderId: id })
-    alertStorage.add({ id: generateId('alert'), type: 'reminder', severity: 'info', title: 'Medication Taken', message: `You took ${reminder.medicineName} at ${formatTime(new Date().toTimeString().slice(0, 5))}`, timestamp: new Date().toISOString(), isRead: false, actionRequired: false, relatedId: id })
+    await adherenceStorage.add({ medicineId: reminder.medicineId, medicineName: reminder.medicineName, dosage: reminder.dosage, takenAt: new Date().toISOString(), reminderId: id })
+    await alertStorage.add({ type: 'reminder', severity: 'info', title: 'Medication Taken', message: `You took ${reminder.medicineName} at ${formatTime(new Date().toTimeString().slice(0, 5))}` })
     loadData()
   }
 
-  const handleSnooze = (id) => {
+  const handleSnooze = async (id) => {
     const reminder = reminders.find(r => r.id === id)
     const snoozeTime = new Date(); snoozeTime.setMinutes(snoozeTime.getMinutes() + 10)
-    reminderStorage.update(id, { nextReminder: snoozeTime.toISOString() })
-    alertStorage.add({ id: generateId('alert'), type: 'reminder', severity: 'info', title: 'Reminder Snoozed', message: `${reminder.medicineName} reminder snoozed for 10 minutes`, timestamp: new Date().toISOString(), isRead: false, actionRequired: false, relatedId: id })
+    await reminderStorage.update(id, { nextReminderAt: snoozeTime.toISOString() })
+    await alertStorage.add({ type: 'reminder', severity: 'info', title: 'Reminder Snoozed', message: `${reminder.medicineName} reminder snoozed for 10 minutes` })
     loadData()
   }
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this reminder?')) { reminderStorage.delete(id); loadData() }
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this reminder?')) { await reminderStorage.delete(id); loadData() }
   }
 
-  const handleToggleActive = (id) => {
+  const handleToggleActive = async (id) => {
     const reminder = reminders.find(r => r.id === id)
-    reminderStorage.update(id, { isActive: !reminder.isActive }); loadData()
+    await reminderStorage.update(id, { isActive: !reminder.isActive }); loadData()
   }
 
   const getTodayReminders = () => reminders.filter(r => r.isActive)
@@ -228,16 +228,16 @@ const ReminderForm = ({ medications, onClose, onSave }) => {
   const [notes, setNotes] = useState('')
   const [notificationEnabled, setNotificationEnabled] = useState(true)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const medication = medications.find(m => m.id === selectedMed)
     if (!medication) return
     const reminder = {
-      id: generateId('reminder'), medicineId: medication.id, medicineName: medication.name,
-      dosage: medication.dosage, time, frequency, days: [], isActive: true, lastTaken: '',
-      nextReminder: calculateNextReminder(time), notificationEnabled, notes
+      medicineId: medication.id, medicineName: medication.name,
+      dosage: medication.dosage, time, frequency, isActive: true,
+      nextReminderAt: calculateNextReminder(time)
     }
-    reminderStorage.add(reminder); onSave()
+    await reminderStorage.add(reminder); onSave()
   }
 
   const calculateNextReminder = (timeStr) => {

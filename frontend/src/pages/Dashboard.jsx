@@ -43,27 +43,28 @@ const Dashboard = () => {
     return () => clearInterval(t)
   }, [])
 
-  const loadDashboardData = () => {
-    const prescriptions = prescriptionStorage.getAll()
-    const medications   = medicationStorage.getActive()
-    const reminders     = reminderStorage.getActive()
-    const alerts        = alertStorage.getUnread()
+  const loadDashboardData = async () => {
+    const prescriptions = await prescriptionStorage.getAll()
+    const medications   = await medicationStorage.getActive()
+    const reminders     = await reminderStorage.getActive()
+    const alerts        = await alertStorage.getUnread()
 
     setStats({ totalPrescriptions: prescriptions.length, activeMedications: medications.length, todayReminders: reminders.length, activeAlerts: alerts.length })
     setRecentActivity([...prescriptions].sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate)).slice(0, 3))
-    setUpcomingReminders([...reminders].sort((a, b) => new Date(a.nextReminder) - new Date(b.nextReminder)).slice(0, 3))
+    setUpcomingReminders([...reminders].sort((a, b) => new Date(a.nextReminderAt || a.nextReminder) - new Date(b.nextReminderAt || b.nextReminder)).slice(0, 3))
 
     // meds expiring in <= 3 days
     const now3 = new Date()
     const in3  = new Date(); in3.setDate(in3.getDate() + 3)
-    setExpiringMeds(medications.filter(m => { const end = new Date(m.endDate); return end >= now3 && end <= in3 }))
+    setExpiringMeds(medications.filter(m => { const end = new Date(m.endDate || m.end_date); return end >= now3 && end <= in3 }))
 
     // weekly adherence bars
     const today = new Date()
     const week  = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today); d.setDate(d.getDate() - i)
-      week.push({ label: d.toLocaleDateString('en-IN', { weekday: 'short' }), taken: adherenceStorage.getByDate(d.toISOString()).length })
+      const data = await adherenceStorage.getByDate(d.toISOString())
+      week.push({ label: d.toLocaleDateString('en-IN', { weekday: 'short' }), taken: data.length })
     }
     setWeeklyAdherence(week)
   }
