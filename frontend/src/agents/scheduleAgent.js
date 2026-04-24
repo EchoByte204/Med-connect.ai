@@ -10,95 +10,78 @@ import { reminderStorage } from '../utils/storage'
  * @param {Object} medication - Medication object
  * @returns {Array} - Array of created reminders
  */
-export const createRemindersForMedication = (medication) => {
+export const createRemindersForMedication = async (medication) => {
   const reminders = []
   const times = generateReminderTimes(medication.frequency)
   
-  times.forEach((time) => {
+  for (const time of times) {
     const reminder = {
-      id: generateId('reminder'),
       medicineId: medication.id,
       medicineName: medication.name,
       dosage: medication.dosage,
       time: time,
       frequency: medication.frequency,
-      days: [0, 1, 2, 3, 4, 5, 6], // Every day
       isActive: true,
-      lastTaken: null,
-      nextReminder: calculateNextReminder(time),
-      notificationEnabled: true,
-      notes: medication.instructions || ''
+      nextReminderAt: calculateNextReminder(time)
     }
     
-    reminderStorage.add(reminder)
+    await reminderStorage.add(reminder)
     reminders.push(reminder)
-  })
+  }
   
   return reminders
 }
 
-/**
- * Get today's reminders
- */
-export const getTodaysReminders = () => {
-  const allReminders = reminderStorage.getActive()
+export const getTodaysReminders = async () => {
+  const allReminders = await reminderStorage.getActive()
   const now = new Date()
   const today = now.toDateString()
   
   return allReminders.filter(reminder => {
-    const reminderDate = new Date(reminder.nextReminder)
+    const reminderDate = new Date(reminder.nextReminderAt)
     return reminderDate.toDateString() === today
   }).sort((a, b) => {
-    return new Date(a.nextReminder) - new Date(b.nextReminder)
+    return new Date(a.nextReminderAt) - new Date(b.nextReminderAt)
   })
 }
 
-/**
- * Get upcoming reminders (next 24 hours)
- */
-export const getUpcomingReminders = () => {
-  const allReminders = reminderStorage.getActive()
+export const getUpcomingReminders = async () => {
+  const allReminders = await reminderStorage.getActive()
   const now = new Date()
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   
   return allReminders.filter(reminder => {
-    const reminderDate = new Date(reminder.nextReminder)
+    const reminderDate = new Date(reminder.nextReminderAt)
     return reminderDate >= now && reminderDate <= tomorrow
   }).sort((a, b) => {
-    return new Date(a.nextReminder) - new Date(b.nextReminder)
+    return new Date(a.nextReminderAt) - new Date(b.nextReminderAt)
   })
 }
 
-/**
- * Mark reminder as taken
- */
-export const markReminderAsTaken = (reminderId) => {
-  const reminder = reminderStorage.getById(reminderId)
+export const markReminderAsTaken = async (reminderId) => {
+  const reminder = await reminderStorage.getById(reminderId)
   if (!reminder) return false
   
   const now = new Date()
   const nextReminder = calculateNextReminder(reminder.time)
   
-  reminderStorage.update(reminderId, {
+  await reminderStorage.update(reminderId, {
     lastTaken: now.toISOString(),
-    nextReminder: nextReminder
+    nextReminderAt: nextReminder
   })
   
   return true
 }
 
-/**
- * Snooze reminder for X minutes
- */
-export const snoozeReminder = (reminderId, minutes = 10) => {
-  const reminder = reminderStorage.getById(reminderId)
+export const snoozeReminder = async (reminderId, minutes = 10) => {
+  const reminder = await reminderStorage.getById(reminderId)
   if (!reminder) return false
   
   const now = new Date()
   const snoozeUntil = new Date(now.getTime() + minutes * 60 * 1000)
   
-  reminderStorage.update(reminderId, {
-    nextReminder: snoozeUntil.toISOString()
+  await reminderStorage.update(reminderId, {
+    nextReminderAt: snoozeUntil.toISOString()
   })
   
   return true

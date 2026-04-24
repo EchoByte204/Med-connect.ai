@@ -40,17 +40,12 @@ export const getUserLocation = () => {
  * @returns {Promise<Array>} - Array of pharmacy objects
  */
 export const findNearbyPharmacies = async (location, radius = 5000) => {
-  try {
-    // If no API key is configured the fallback data is perfectly usable —
-    // bail early so we never hit the network and never crash.
-    if (!GOOGLE_PLACES_API_KEY) {
-      console.warn('VITE_GOOGLE_PLACES_API_KEY is not set — using fallback pharmacies.')
-      return getFallbackPharmacies(location)
-    }
+  if (!GOOGLE_PLACES_API_KEY) {
+    console.warn('VITE_GOOGLE_PLACES_API_KEY not set — using fallback pharmacies.')
+    return getFallbackPharmacies(location)
+  }
 
-    // Hit the Vite dev-server proxy (or your production rewrite rule).
-    // The proxy forwards to Google and injects the key server-side,
-    // so no CORS proxy and no key in the browser bundle.
+  try {
     const url =
       `/api/places/nearbysearch/json` +
       `?location=${location.lat},${location.lng}` +
@@ -59,19 +54,12 @@ export const findNearbyPharmacies = async (location, radius = 5000) => {
       `&key=${GOOGLE_PLACES_API_KEY}`
 
     const response = await fetch(url)
-
-    if (!response.ok) {
-      throw new Error(`Places API HTTP ${response.status}`)
-    }
+    if (!response.ok) throw new Error(`Places API HTTP ${response.status}`)
 
     const data = await response.json()
+    if (data.status !== 'OK') throw new Error(`Places API error: ${data.status}`)
 
-    if (data.status !== 'OK') {
-      throw new Error(`Places API error: ${data.status}`)
-    }
-
-    // Transform Google Places data to our format
-    const pharmacies = data.results.map((place, index) => ({
+    const pharmacies = data.results.map((place) => ({
       id: place.place_id,
       name: place.name,
       address: place.vicinity,
@@ -85,15 +73,11 @@ export const findNearbyPharmacies = async (location, radius = 5000) => {
       distance: calculateDistance(location, place.geometry.location),
       placeId: place.place_id
     }))
-    
-    // Sort by distance
+
     pharmacies.sort((a, b) => a.distance - b.distance)
-    
     return pharmacies
-    
   } catch (error) {
     console.error('Error finding pharmacies:', error)
-    // Return fallback data if API fails
     return getFallbackPharmacies(location)
   }
 }
@@ -156,71 +140,43 @@ const toRad = (degrees) => {
   return degrees * (Math.PI / 180)
 }
 
-/**
- * Fallback pharmacy data (if API fails or for demo)
- */
 const getFallbackPharmacies = (userLocation) => {
   const fallbackData = [
     {
-      id: 'fallback_1',
-      name: 'Apollo Pharmacy',
+      id: 'fallback_1', name: 'Apollo Pharmacy',
       address: 'MG Road, Bengaluru',
       location: { lat: 12.9752, lng: 77.6070 },
-      rating: 4.2,
-      totalRatings: 150,
-      isOpen: true,
-      distance: 1.2
+      rating: 4.2, totalRatings: 150, isOpen: true, distance: 1.2
     },
     {
-      id: 'fallback_2',
-      name: 'Medplus',
+      id: 'fallback_2', name: 'Medplus',
       address: 'Indiranagar, Bengaluru',
       location: { lat: 12.9784, lng: 77.6408 },
-      rating: 4.0,
-      totalRatings: 98,
-      isOpen: true,
-      distance: 2.5
+      rating: 4.0, totalRatings: 98, isOpen: true, distance: 2.5
     },
     {
-      id: 'fallback_3',
-      name: 'Wellness Forever',
+      id: 'fallback_3', name: 'Wellness Forever',
       address: 'Koramangala, Bengaluru',
       location: { lat: 12.9352, lng: 77.6245 },
-      rating: 4.3,
-      totalRatings: 210,
-      isOpen: true,
-      distance: 3.2
+      rating: 4.3, totalRatings: 210, isOpen: true, distance: 3.2
     },
     {
-      id: 'fallback_4',
-      name: 'Pharmacy Plus',
+      id: 'fallback_4', name: 'Pharmacy Plus',
       address: 'HSR Layout, Bengaluru',
       location: { lat: 12.9121, lng: 77.6446 },
-      rating: 3.9,
-      totalRatings: 76,
-      isOpen: false,
-      distance: 4.1
+      rating: 3.9, totalRatings: 76, isOpen: false, distance: 4.1
     },
     {
-      id: 'fallback_5',
-      name: 'HealthKart Pharmacy',
+      id: 'fallback_5', name: 'HealthKart Pharmacy',
       address: 'Whitefield, Bengaluru',
       location: { lat: 12.9698, lng: 77.7500 },
-      rating: 4.1,
-      totalRatings: 132,
-      isOpen: true,
-      distance: 4.8
+      rating: 4.1, totalRatings: 132, isOpen: true, distance: 4.8
     }
   ]
-  
-  // Calculate actual distances if user location available
   if (userLocation) {
-    fallbackData.forEach(pharmacy => {
-      pharmacy.distance = calculateDistance(userLocation, pharmacy.location)
-    })
+    fallbackData.forEach(p => { p.distance = calculateDistance(userLocation, p.location) })
     fallbackData.sort((a, b) => a.distance - b.distance)
   }
-  
   return fallbackData
 }
 

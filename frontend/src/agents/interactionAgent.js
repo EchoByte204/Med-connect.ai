@@ -28,11 +28,11 @@ export const checkMedicationInteractions = async (medications) => {
   
   // Create alerts for severe interactions
   if (result.success && result.interactions.length > 0) {
-    result.interactions.forEach(interaction => {
+    await Promise.all(result.interactions.map(async interaction => {
       if (interaction.severity === 'severe' || interaction.severity === 'moderate') {
-        createInteractionAlert(interaction)
+        await createInteractionAlert(interaction)
       }
-    })
+    }))
   }
   
   return result
@@ -52,17 +52,12 @@ export const checkTwoMedicines = async (medicine1, medicine2) => {
 /**
  * Create alert for drug interaction
  */
-const createInteractionAlert = (interaction) => {
-  alertStorage.add({
-    id: generateId('alert'),
+const createInteractionAlert = async (interaction) => {
+  await alertStorage.add({
     type: 'interaction',
     severity: interaction.severity === 'severe' ? 'danger' : 'warning',
     title: `⚠️ Drug Interaction Warning`,
-    message: `${interaction.medicine1} and ${interaction.medicine2}: ${interaction.description}`,
-    timestamp: new Date().toISOString(),
-    isRead: false,
-    actionRequired: true,
-    relatedId: null
+    message: `${interaction.medicine1} and ${interaction.medicine2}: ${interaction.description}`
   })
 }
 
