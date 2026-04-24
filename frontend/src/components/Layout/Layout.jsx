@@ -3,9 +3,11 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   Home, FileText, Pill, Bell, MapPin, Settings,
   Menu, X, Activity, Stethoscope, Building2, MessageSquare,
-  Search, Clock
+  Search, Clock, Shield
 } from 'lucide-react'
 import NotificationBell from '../Notifications/NotificationBell'
+import LogoutButton from '../LogoutButton'
+import { useAuth } from '../../contexts/AuthContext'
 import { useDarkMode } from '../../App'
 import { prescriptionStorage, medicationStorage } from '../../utils/storage'
 import { doctorsData } from '../../data/doctorsData'
@@ -21,16 +23,19 @@ const HOSPITALS = [
 ]
 
 /* ── run query across all data, return categorised hits ── */
-const runGlobalSearch = (q) => {
+const runGlobalSearch = async (q) => {
   if (!q) return { prescriptions: [], medications: [], doctors: [], hospitals: [] }
   const lower = q.toLowerCase()
   const match = (str) => str && str.toLowerCase().includes(lower)
 
+  const dbPrescriptions = await prescriptionStorage.getAll()
+  const dbMedications = await medicationStorage.getAll()
+
   return {
-    prescriptions: prescriptionStorage.getAll().filter(p =>
+    prescriptions: dbPrescriptions.filter(p =>
       match(p.fileName) || match(p.rawText) || (p.medicines || []).some(m => match(m.name))
     ),
-    medications: medicationStorage.getAll().filter(m =>
+    medications: dbMedications.filter(m =>
       match(m.name) || match(m.genericName) || match(m.category) || match(m.instructions)
     ),
     doctors: doctorsData.filter(d =>
@@ -50,6 +55,7 @@ const Layout = ({ children }) => {
   const [recentSearches, setRecentSearches] = useState([])
   const location                      = useLocation()
   const { darkMode }                  = useDarkMode()
+  const { user }                      = useAuth()
   const searchInputRef                = useRef(null)
 
   /* close search on route change */
@@ -74,7 +80,10 @@ const Layout = ({ children }) => {
 
   /* run search on every keystroke */
   useEffect(() => {
-    setResults(runGlobalSearch(searchQuery))
+    const fetchSearch = async () => {
+      setResults(await runGlobalSearch(searchQuery))
+    }
+    fetchSearch()
   }, [searchQuery])
 
   const handlePickResult = () => {
@@ -89,15 +98,16 @@ const Layout = ({ children }) => {
   const totalHits = results.prescriptions.length + results.medications.length + results.doctors.length + results.hospitals.length
 
   const navigation = [
-    { name: 'Dashboard',      path: '/',             icon: Home },
-    { name: 'Prescriptions',  path: '/prescriptions', icon: FileText },
-    { name: 'Medications',    path: '/medications',   icon: Pill },
-    { name: 'Reminders',      path: '/reminders',     icon: Bell },
-    { name: 'Pharmacy Finder',path: '/pharmacy',      icon: MapPin },
-    { name: 'Find Doctors',   path: '/doctors',       icon: Stethoscope },
-    { name: 'Find Hospitals', path: '/hospitals',     icon: Building2 },
-    { name: 'Health Chatbot', path: '/chatbot',       icon: MessageSquare },
-    { name: 'Settings',       path: '/settings',      icon: Settings }
+    { name: 'Dashboard',           path: '/',              icon: Home },
+    { name: 'Prescriptions',       path: '/prescriptions', icon: FileText },
+    { name: 'Medications',         path: '/medications',   icon: Pill },
+    { name: 'Reminders',           path: '/reminders',     icon: Bell },
+    { name: 'Drug Interactions',   path: '/interactions',  icon: Shield },
+    { name: 'Pharmacy Finder',     path: '/pharmacy-finder',      icon: MapPin },
+    { name: 'Find Doctors',        path: '/doctors',       icon: Stethoscope },
+    { name: 'Find Hospitals',      path: '/hospital-finder',     icon: Building2 },
+    { name: 'Health Chatbot',      path: '/chatbot',       icon: MessageSquare },
+    { name: 'Settings',            path: '/settings',      icon: Settings }
   ]
 
   const isActive = (path) => location.pathname === path
@@ -121,9 +131,9 @@ const Layout = ({ children }) => {
               </Link>
             </div>
 
-            {/* Search trigger + Notifications */}
+            {/* Right side: Search + User Email + Notifications + Logout */}
             <div className="flex items-center gap-3">
-              {/* search pill button */}
+              {/* Search pill button */}
               <button
                 onClick={() => setSearchOpen(true)}
                 className={`hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-lg border transition-colors ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
@@ -132,10 +142,26 @@ const Layout = ({ children }) => {
                 <span className="text-sm">Search…</span>
                 <span className={`text-xs ml-2 px-1.5 py-0.5 rounded ${darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-100 text-gray-500'}`}>⌘K</span>
               </button>
-              {/* mobile search icon */}
-              <button onClick={() => setSearchOpen(true)} className={`sm:hidden p-2 rounded-md ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}>
+
+              {/* Mobile search icon */}
+              <button 
+                onClick={() => setSearchOpen(true)} 
+                className={`sm:hidden p-2 rounded-md ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
                 <Search className="h-5 w-5" />
               </button>
+
+              {/* User Info + Logout (visible when authenticated) */}
+              {user && (
+                <div className="hidden md:flex items-center gap-2">
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {user.email}
+                  </span>
+                  <LogoutButton variant="icon" />
+                </div>
+              )}
+
+              {/* Notifications */}
               <NotificationBell />
             </div>
           </div>
@@ -172,6 +198,19 @@ const Layout = ({ children }) => {
                 )
               })}
             </div>
+
+            {/* User Info in Sidebar (mobile only) */}
+            {user && (
+              <div className="md:hidden mt-6 px-6 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Logged in as:
+                </div>
+                <div className={`text-sm font-medium mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-900'} truncate`}>
+                  {user.email}
+                </div>
+                <LogoutButton />
+              </div>
+            )}
 
             {/* Pro tip box */}
             <div className="mt-8 px-6">
